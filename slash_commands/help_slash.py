@@ -13,7 +13,7 @@ def setup(bot):
         embed = discord.Embed(
             title="🍞 BreadBot Help",
             description="Here are all the commands and features available!",
-            color=discord.Color.gold()  # Bread-colored!
+            color=0x89CFF0  # BreadBot's primary color (baby blue)
         )
 
         # Slash Commands Section

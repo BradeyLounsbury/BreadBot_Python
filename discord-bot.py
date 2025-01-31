@@ -4,8 +4,8 @@ import os
 from dotenv import load_dotenv
 
 # Import command modules
-from prefix_commands import hello_command, ping_command, play_command
-from slash_commands import hello_slash_command, ping_slash_command, help_slash_command
+from prefix_commands import hello, pause, ping, play, queue, skip
+from slash_commands import hello_slash, help_slash, ping_slash
 
 # Load environment variables
 load_dotenv()
@@ -32,13 +32,16 @@ async def on_ready():
 # Setup commands
 def setup_commands(bot):
     """Setup all command modules"""
-    hello_command.setup(bot)
-    ping_command.setup(bot)
-    play_command.setup(bot)
+    hello.setup(bot)
+    pause.setup(bot)
+    ping.setup(bot)
+    play.setup(bot)
+    queue.setup(bot)
+    skip.setup(bot)
 
-    hello_slash_command.setup(bot)
-    ping_slash_command.setup(bot)
-    help_slash_command.setup(bot)
+    hello_slash.setup(bot)
+    ping_slash.setup(bot)
+    help_slash.setup(bot)
 
 @bot.event
 async def on_message(message):
