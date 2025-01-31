@@ -24,7 +24,7 @@ async def on_ready():
     print(f'{bot.user} has connected to Discord!')
     try:
         synced = await bot.tree.sync()
-        await bot.sync_commands()
+        # await bot.sync_commands()
         print(f"Synced {len(synced)} command(s)")
     except Exception as e:
         print(f"Failed to sync commands: {e}")
