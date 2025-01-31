@@ -4,7 +4,7 @@ import os
 from dotenv import load_dotenv
 
 # Import command modules
-from prefix_commands import hello_command, ping_command
+from prefix_commands import hello_command, ping_command, play_command
 from slash_commands import hello_slash_command, ping_slash_command, help_slash_command
 
 # Load environment variables
@@ -34,6 +34,8 @@ def setup_commands(bot):
     """Setup all command modules"""
     hello_command.setup(bot)
     ping_command.setup(bot)
+    play_command.setup(bot)
+
     hello_slash_command.setup(bot)
     ping_slash_command.setup(bot)
     help_slash_command.setup(bot)
