@@ -1,5 +1,6 @@
 import discord
 from discord.ext import commands
+from libs.music.core import MusicPlayer, players
 
 def setup(bot):
     """Setup the pause command"""
@@ -9,8 +10,10 @@ def setup(bot):
         if not ctx.voice_client:
             await ctx.send("I'm not currently playing anything!")
             return
-            
+        
+        player = players[ctx.guild.id]
         if ctx.voice_client.is_playing():
+            player.pause_playback()
             ctx.voice_client.pause()
             
             # Create pause embed
@@ -22,6 +25,7 @@ def setup(bot):
             await ctx.send(embed=embed)
             
         elif ctx.voice_client.is_paused():
+            player.resume_playback()
             ctx.voice_client.resume()
             
             # Create resume embed

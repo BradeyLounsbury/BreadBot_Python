@@ -12,6 +12,11 @@ class MusicPlayer:
         self.queue = deque()
         self.current_song = None
         self.is_playing = False
+        self.started_playing_at = None
+        self.is_paused = False
+        self.pause_duration = timedelta()
+        self.last_pause_time = None
+        self.current_update_task = None  # Store the current progress update task
 
     def add_to_queue(self, song):
         self.queue.append(song)
@@ -22,6 +27,58 @@ class MusicPlayer:
     def clear_queue(self):
         self.queue.clear()
         self.current_song = None
+
+
+    def start_playback(self):
+        self.started_playing_at = datetime.now()
+        self.is_playing = True
+        self.is_paused = False
+        
+    def pause_playback(self):
+        if not self.is_paused:
+            self.is_paused = True
+            self.last_pause_time = datetime.now()
+
+    def resume_playback(self):
+        if self.is_paused:
+            self.is_paused = False
+            self.pause_duration += datetime.now() - self.last_pause_time
+            self.last_pause_time = None
+
+    def get_current_position(self):
+        """Get current position in seconds"""
+        if not self.started_playing_at:
+            return 0
+            
+        if self.is_paused:
+            elapsed = self.last_pause_time - self.started_playing_at - self.pause_duration
+        else:
+            elapsed = datetime.now() - self.started_playing_at - self.pause_duration
+            
+        return elapsed.total_seconds()
+
+    def create_progress_bar(self, length=20):
+        """Create a text-based progress bar using only ▬"""
+        if not self.current_song or not self.started_playing_at:
+            return "▬" * length
+            
+        position = self.get_current_position()
+        duration = self.current_song.duration
+        
+        if duration == 0:  # Avoid division by zero
+            return "▬" * length
+            
+        progress = min(position / duration, 1.0)
+        slider_pos = int(length * progress)
+        
+        # Create bar with all ▬
+        bar = "▬" * length
+        
+        # Insert slider at position
+        bar_list = list(bar)
+        slider_pos = min(slider_pos, length - 1)  # Ensure slider doesn't go past the end
+        bar_list[slider_pos] = "🔘"
+        return "".join(bar_list)
 
 class Song:
     def __init__(self, filename, full_path, requester):

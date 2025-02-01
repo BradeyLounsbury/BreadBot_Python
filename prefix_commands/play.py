@@ -4,6 +4,61 @@ import os
 import asyncio
 from libs.music.core import MusicPlayer, Song, players
 
+async def update_progress(ctx, player, message):
+    """Update the progress bar every 10 seconds"""
+    while player.is_playing and player.current_song:
+        try:
+            # Create updated embed
+            embed = discord.Embed(
+                title="🎵 Now Playing",
+                description=f"**{player.current_song.name}**",
+                color=0x89CFF0
+            )
+            
+            # Add progress bar
+            position = player.get_current_position()
+            duration = player.current_song.duration
+            progress_bar = player.create_progress_bar()
+            
+            time_format = lambda s: f"{int(s/60):02d}:{int(s%60):02d}"
+            progress_text = f"\n{time_format(position)} {progress_bar} {time_format(duration)}"
+            
+            embed.add_field(
+                name="Progress",
+                value=progress_text,
+                inline=False
+            )
+            
+            embed.add_field(
+                name="Requested by",
+                value=player.current_song.requester.display_name,
+                inline=True
+            )
+            
+            if player.current_song.requester.avatar:
+                embed.set_thumbnail(url=player.current_song.requester.avatar.url)
+            
+            await message.edit(embed=embed)
+            
+            # Wait 10 seconds before next update
+            await asyncio.sleep(10)
+            
+        except discord.NotFound:
+            # Message was deleted
+            break
+        except Exception as e:
+            print(f"Error updating progress: {e}")
+            break
+
+def after_song_callback(error, ctx, bot):
+    """Callback that runs after a song finishes"""
+    if error:
+        print(f'Player error: {error}')
+        return
+
+    # Use create_task to schedule play_next in the event loop
+    bot.loop.create_task(play_next(ctx, bot))
+
 async def play_next(ctx, bot):
     """Play the next song in the queue"""
     player = players[ctx.guild.id]
@@ -26,6 +81,13 @@ async def play_next(ctx, bot):
         description=f"**{next_song.name}**",
         color=0x89CFF0
     )
+    # Add initial progress bar
+    progress_text = f"\n00:00 ▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬ {next_song.formatted_duration}"
+    embed.add_field(
+        name="Progress",
+        value=progress_text,
+        inline=False
+    )
     embed.add_field(
         name="Requested by",
         value=next_song.requester.display_name,
@@ -39,10 +101,19 @@ async def play_next(ctx, bot):
     if next_song.requester.avatar:
         embed.set_thumbnail(url=next_song.requester.avatar.url)
     
-    await ctx.send(embed=embed)
+    # Send embed and start progress updates
+    now_playing_message = await ctx.send(embed=embed)
+    player.start_playback()
     
-    ctx.voice_client.play(audio_source, after=lambda e: asyncio.run_coroutine_threadsafe(
-        play_next(ctx, bot), bot.loop).result() if e is None else print(f'Player error: {e}'))
+    # Start progress update task
+    update_task = bot.loop.create_task(update_progress(ctx, player, now_playing_message))
+    player.current_update_task = update_task
+    
+    # Use functools.partial to pass additional arguments to the callback
+    from functools import partial
+    callback = partial(after_song_callback, ctx=ctx, bot=bot)
+    
+    ctx.voice_client.play(audio_source, after=callback)
 
 def setup(bot):
     """Setup the play command"""
@@ -103,6 +174,13 @@ def setup(bot):
                     description=f"**{song.name}**",
                     color=0x89CFF0
                 )
+                # Add initial progress bar
+                progress_text = f"\n00:00 ▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬ {song.formatted_duration}"
+                embed.add_field(
+                    name="Progress",
+                    value=progress_text,
+                    inline=False
+                )
                 embed.add_field(
                     name="Requested by",
                     value=song.requester.display_name,
@@ -116,10 +194,19 @@ def setup(bot):
                 if song.requester.avatar:
                     embed.set_thumbnail(url=song.requester.avatar.url)
                 
-                await ctx.send(embed=embed)
+                # Send embed and start progress updates
+                now_playing_message = await ctx.send(embed=embed)
+                player.start_playback()
                 
-                ctx.voice_client.play(audio_source, after=lambda e: asyncio.run_coroutine_threadsafe(
-                    play_next(ctx, bot), bot.loop).result() if e is None else print(f'Player error: {e}'))
+                # Start progress update task
+                update_task = bot.loop.create_task(update_progress(ctx, player, now_playing_message))
+                player.current_update_task = update_task
+                
+                # Use functools.partial to pass additional arguments to the callback
+                from functools import partial
+                callback = partial(after_song_callback, ctx=ctx, bot=bot)
+                
+                ctx.voice_client.play(audio_source, after=callback)
             else:
                 # Add to queue
                 player.add_to_queue(song)
