@@ -127,5 +127,23 @@ class Song:
         else:
             return f"{minutes}:{seconds:02d}"
 
+# Create a custom Song object for streaming
+class StreamSong:
+    def __init__(self, source, requester):
+        self.name = source.title
+        self.duration = source.duration
+        self.requester = requester
+        self.stream_url = source.url
+        self.thumbnail = source.thumbnail
+        self.webpage_url = source.webpage_url
+        self.added_at = datetime.now()
+    @property
+    def formatted_duration(self):
+        duration = timedelta(seconds=self.duration)
+        hours = duration.seconds // 3600
+        minutes = (duration.seconds % 3600) // 60
+        seconds = duration.seconds % 60
+        return f"{hours}:{minutes:02d}:{seconds:02d}" if hours else f"{minutes}:{seconds:02d}"
+
 # Shared music player instance for all commands
 players = {}
