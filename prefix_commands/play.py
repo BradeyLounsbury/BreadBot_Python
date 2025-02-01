@@ -13,7 +13,18 @@ base_opts = {
     'quiet': True,
     'default_search': 'ytsearch',
     'noplaylist': True,
-    'cookies': '../cookies.txt'
+    'format': 'bestaudio/best',
+    'quiet': True,
+    'default_search': 'ytsearch',
+    'noplaylist': True,
+    'cookiefile': '../cookies.txt',
+    'geo_bypass': True,
+    'nocheckcertificate': True,
+    'extractor_retries': 3,
+    'socket_timeout': 15,
+    'http_headers': {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    }
 }
 
 # Streaming-specific options
