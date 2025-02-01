@@ -12,7 +12,8 @@ base_opts = {
     'format': 'bestaudio/best',
     'quiet': True,
     'default_search': 'ytsearch',
-    'noplaylist': True
+    'noplaylist': True,
+    'cookies': '../cookies.txt'
 }
 
 # Streaming-specific options
