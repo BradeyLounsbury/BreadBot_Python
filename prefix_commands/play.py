@@ -3,89 +3,104 @@ from discord.ext import commands
 import os
 import asyncio
 from functools import partial
-from youtubesearchpython import VideosSearch
-import yt_dlp
+import uuid
 from libs.music.core import MusicPlayer, Song, StreamSong, players
+from libs.music.ytdl_processor import YTDLProcessor
 
-# Base options for both streaming and downloading
-base_opts = {
-    'format': 'bestaudio/best',
-    'quiet': True,
-    'default_search': 'ytsearch',
-    'noplaylist': True,
-    'cookiefile': '../cookies.txt',
-    'geo_bypass': True,
-    'nocheckcertificate': True,
-    'extractor_retries': 3,
-    'socket_timeout': 15,
-    'http_headers': {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-    }
-}
-
-# Streaming-specific options
-stream_opts = {
-    **base_opts,
-    'extract_audio': True,
-    'format': 'bestaudio/best',
-    'postprocessors': [{
-        'key': 'FFmpegExtractAudio',
-        'preferredcodec': 'mp3',
-        'preferredquality': '192',
-    }],
-}
-
-# Download options (used as fallback)
-download_opts = {
-    **base_opts,
-    'format': 'bestaudio/best',
-    'postprocessors': [{
-        'key': 'FFmpegExtractAudio',
-        'preferredcodec': 'mp3',
-        'preferredquality': '192',
-    }],
-    'outtmpl': 'audio/%(title)s.%(ext)s',
-}
+# Create a global YTDLProcessor instance with 2 max processes
+ytdl_processor = YTDLProcessor(max_processes=2)
 
 class YTDLSource(discord.PCMVolumeTransformer):
     def __init__(self, source, *, data, volume=0.5):
         super().__init__(source, volume)
-        self.data = data
         self.title = data.get('title', 'Unknown')
         self.url = data.get('url')
         self.duration = int(data.get('duration', 0))
         self.thumbnail = data.get('thumbnail')
         self.webpage_url = data.get('webpage_url')
+        self.filename = data.get('filename')  # For downloaded files
 
-    @classmethod
-    async def from_url(cls, url, *, loop=None, stream=True):
-        loop = loop or asyncio.get_event_loop()
-        opts = stream_opts if stream else download_opts
-
-        ydl = yt_dlp.YoutubeDL(opts)
-        data = await loop.run_in_executor(None, lambda: ydl.extract_info(url, download=not stream))
+async def check_ytdl_result(ctx, query_id, status_message, query):
+    """
+    Check for YTDL process results periodically and update status message
+    Returns the YTDLSource when complete or None if failed
+    """
+    # Set timeout counter (max 60 seconds)
+    timeout_counter = 0
+    max_timeout = 60
+    
+    while timeout_counter < max_timeout:
+        # Check if result is available
+        result = ytdl_processor.get_result(query_id, timeout=0.5)
         
-        if 'entries' in data:
-            data = data['entries'][0]
-
-        filename = data['url'] if stream else ydl.prepare_filename(data)
-        return cls(discord.FFmpegPCMAudio(filename), data=data)
-
-async def stream_or_download(query, ctx):
-    """Attempt to stream, fallback to download if streaming fails"""
-    try:
-        # First try streaming
-        source = await YTDLSource.from_url(f"ytsearch:{query}", stream=True)
-        return source, True  # True indicates streaming
-    except Exception as e:
-        print(f"Streaming failed, falling back to download: {e}")
-        try:
-            # Fallback to downloading
-            source = await YTDLSource.from_url(f"ytsearch:{query}", stream=False)
-            return source, False  # False indicates downloaded
-        except Exception as e:
-            print(f"Download also failed: {e}")
-            return None, None
+        if result is not None:
+            # Process completed
+            if result['success']:
+                # Success - create appropriate audio source
+                if result['mode'] == 'stream':
+                    # Update status message
+                    embed = discord.Embed(
+                        title="✅ Found!",
+                        description=f"Playing: **{result['title']}**",
+                        color=0x89CFF0
+                    )
+                    if result.get('thumbnail'):
+                        embed.set_thumbnail(url=result['thumbnail'])
+                    await status_message.edit(embed=embed)
+                    
+                    # Create source for streaming
+                    source = discord.FFmpegPCMAudio(result['url'])
+                    ytdl_source = YTDLSource(source, data=result, volume=0.5)
+                    return ytdl_source, True
+                else:
+                    # Downloaded file
+                    embed = discord.Embed(
+                        title="✅ Downloaded!",
+                        description=f"Playing: **{result['title']}**",
+                        color=0x89CFF0
+                    )
+                    if result.get('thumbnail'):
+                        embed.set_thumbnail(url=result['thumbnail'])
+                    await status_message.edit(embed=embed)
+                    
+                    # Get the final filename after post-processing
+                    base_filename = os.path.splitext(result['filename'])[0]
+                    # Try common extensions (.mp3 first since that's our preferred format)
+                    for ext in ['.mp3', '.m4a', '.webm', '.opus']:
+                        test_filename = f"{base_filename}{ext}"
+                        if os.path.exists(test_filename):
+                            source = discord.FFmpegPCMAudio(test_filename)
+                            result['filename'] = test_filename  # Update with actual file
+                            ytdl_source = YTDLSource(source, data=result, volume=0.5)
+                            return ytdl_source, False
+                    
+                    # If we can't find the processed file, report error
+                    await status_message.edit(content="❌ Could not find processed audio file.", embed=None)
+                    return None, None
+            else:
+                # Error occurred
+                await status_message.edit(content=f"❌ Error: {result['error']}", embed=None)
+                return None, None
+        
+        # No result yet, update status message every 5 seconds
+        if timeout_counter % 5 == 0 and timeout_counter > 0:
+            embed = discord.Embed(
+                title="🔍 Still searching...",
+                description=f"Looking for: **{query}** ({timeout_counter}s)",
+                color=0x89CFF0
+            )
+            await status_message.edit(embed=embed)
+        
+        # Increment timeout counter
+        timeout_counter += 1
+        
+        # Short sleep to avoid busy waiting
+        await asyncio.sleep(1)
+    
+    # Timed out
+    ytdl_processor.cancel_process(query_id)
+    await status_message.edit(content="❌ Search timed out after 60 seconds.", embed=None)
+    return None, None
 
 async def update_progress(ctx, player, message):
     """Update the progress bar every 10 seconds"""
@@ -242,25 +257,27 @@ def setup(bot):
         
         # If not a local file, try streaming from YouTube
         if not is_local:
+            # Show searching status
             status_embed = discord.Embed(
                 title="🔍 Searching...",
                 description=f"Looking for: **{query}**",
                 color=0x89CFF0
             )
             status_message = await ctx.send(embed=status_embed)
-
-            source, is_stream = await stream_or_download(query, ctx)
+            
+            # Generate a unique ID for this request
+            query_id = str(uuid.uuid4())
+            
+            # Start the YTDL process in a separate process
+            ytdl_processor.process_url(query_id, query, mode="stream")
+            
+            # Wait for result (non-blocking)
+            source, is_stream = await check_ytdl_result(ctx, query_id, status_message, query)
+            
             if not source:
-                await status_message.edit(content="❌ Failed to play the requested song.", embed=None)
-                return
-
-            # Update status message
-            status_embed.title = "✅ Found!"
-            status_embed.description = f"Playing: **{source.title}**"
-            if source.thumbnail:
-                status_embed.set_thumbnail(url=source.thumbnail)
-            await status_message.edit(embed=status_embed)
-
+                return  # Error message already shown by check_ytdl_result
+            
+            # Create StreamSong from YTDLSource
             song = StreamSong(source, ctx.author)
         else:
             # Use regular Song class for local files
