@@ -34,7 +34,8 @@ def setup(bot):
             "`-pause` - Pause/resume the current song\n"
             "`-skip` - Skip to the next song in queue\n"
             "`-stop` - Stop playing, clear queue, and disconnect\n"
-            "`-queue` - Show the current music queue"
+            "`-queue` - Show the current music queue\n"
+            "`-remove <position>` or `-r <position>` - Remove a song from queue by position number\n`-rl` - Remove the last song in queue\n"
         )
         embed.add_field(
             name="🎵 Music Commands",

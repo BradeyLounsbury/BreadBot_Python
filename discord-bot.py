@@ -4,7 +4,7 @@ import os
 from dotenv import load_dotenv
 
 # Import command modules
-from prefix_commands import hello, pause, ping, play, queue, skip, stop
+from prefix_commands import hello, pause, ping, play, queue, remove, skip, stop
 from slash_commands import hello_slash, help_slash, ping_slash
 
 # Load environment variables
@@ -37,6 +37,7 @@ def setup_commands(bot):
     ping.setup(bot)
     play.setup(bot)
     queue.setup(bot)
+    remove.setup(bot)
     skip.setup(bot)
     stop.setup(bot)
 
