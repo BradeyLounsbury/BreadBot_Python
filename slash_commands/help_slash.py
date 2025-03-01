@@ -33,6 +33,7 @@ def setup(bot):
             "`-play <query>` - Play a song from YouTube or local audio file\n"
             "`-pause` - Pause/resume the current song\n"
             "`-skip` - Skip to the next song in queue\n"
+            "`-stop` - Stop playing, clear queue, and disconnect\n"
             "`-queue` - Show the current music queue"
         )
         embed.add_field(
