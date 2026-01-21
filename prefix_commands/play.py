@@ -284,12 +284,25 @@ def setup(bot):
             song = Song(actual_filename, full_path, ctx.author)
 
         try:
+            voice_client_connected = False
+
             # Connect to voice channel if not already connected
             if ctx.voice_client is None:
                 await voice_channel.connect()
+                voice_client_connected = True
             elif ctx.voice_client.channel != voice_channel:
                 await ctx.voice_client.move_to(voice_channel)
+                voice_client_connected = True
+
+            # Add delay after connecting to allow voice connection to stabilize
+            if voice_client_connected:
+                await asyncio.sleep(1.5)  # Give the voice connection time to establish
             
+            # Verify connection is still active
+            if not ctx.voice_client or not ctx.voice_client.is_connected():
+                await ctx.send("❌ Failed to establish voice connection. Please try again.")
+                return
+
             if not player.is_playing:
                 player.current_song = song
                 player.is_playing = True

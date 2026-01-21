@@ -4,7 +4,7 @@ import os
 from dotenv import load_dotenv
 
 # Import command modules
-from prefix_commands import hello, pause, ping, play, queue, remove, skip, stop
+from prefix_commands import hello, join, pause, ping, play, queue, remove, skip, stop
 from slash_commands import hello_slash, help_slash, ping_slash
 
 # Load environment variables
@@ -14,6 +14,8 @@ load_dotenv()
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
+intents.voice_states = True
+intents.guilds = True
 
 # Create bot instance with modified prefix
 bot = commands.Bot(command_prefix='-', intents=intents)
@@ -163,6 +165,7 @@ async def on_ready():
 def setup_commands(bot):
     """Setup all command modules"""
     hello.setup(bot)
+    join.setup(bot)
     pause.setup(bot)
     ping.setup(bot)
     play.setup(bot)
